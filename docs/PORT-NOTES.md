@@ -13,7 +13,9 @@ lineage-20（A13），所以整棵树要按 WayDroid-ATV 的 `lineage-23.2` 基�
   AviumUI 在这些仓库里的定制暂时放弃（保真化作为第二步）。
 - 保真路线：逐个把 Waydroid 的改动 rebase 到 AviumUI 的 fork 上——工时数天，暂不做。
 
-GApps：按 `vendor/gapps @ baklava` 带上。
+GApps：移植验证阶段按 `vendor/gapps @ baklava` 带过；**最终开源/分发配置改为不含 GApps**
+（`manifests/02-waydroid-nogapps.xml`，移除 `vendor/gapps` 与 `vendor/gapps_tv`），避免违反
+Google 服务条款。本机自用的含 GApps 版本只作为验证环境，不作为发布物。
 
 ## 2. 清单适配（最大的一块）
 

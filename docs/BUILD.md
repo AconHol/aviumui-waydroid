@@ -40,15 +40,19 @@ repo init -u https://github.com/AviumUI/android_manifests -b avium-16.2 --depth=
 |---|---|
 | `00-remotes.xml` | 追加 WayDroid-ATV 的 remote |
 | `01-removes.xml` | 移除 17 个会被 Waydroid 版本替换的仓库（**已按 AviumUI 真实仓库名翻译**，见 `docs/MANIFEST-TRANSLATION.md`） |
-| `02-waydroid.xml` | 加入 37 个 Waydroid 专属仓库（含 `vendor/gapps`、`device/waydroid` 等） |
+| `02-waydroid-nogapps.xml` | 加入 35 个 Waydroid 专属仓库（`device/waydroid`、`hardware/waydroid` 等），**不含 GApps** —— 默认用这个 |
+| `02-waydroid.xml` | 同上但含 `vendor/gapps` + `vendor/gapps_tv`（仅限本机自用，产物不要公开分发） |
 
 ```sh
 mkdir -p .repo/local_manifests
-cp /path/to/aviumui-waydroid/manifests/*.xml .repo/local_manifests/
+cp /path/to/aviumui-waydroid/manifests/00-remotes.xml \
+   /path/to/aviumui-waydroid/manifests/01-removes.xml \
+   /path/to/aviumui-waydroid/manifests/02-waydroid-nogapps.xml \
+   .repo/local_manifests/
 repo sync -j8 --force-sync
 ```
 
-验收：`repo list | wc -l` 应为 **1197** 个工程；`device/waydroid`、`hardware/waydroid`、
+验收：`repo list | wc -l` 约为 **1195** 个工程（无 GApps，比含 GApps 的 1197 少 2 个）；`device/waydroid`、`hardware/waydroid`、
 `frameworks/waydroid`、8 个 fork 仓库都要在位。
 
 ## 3. 打 Waydroid 补丁
@@ -95,7 +99,13 @@ out/target/product/waydroid_x86_64/system.img   # EROFS，~2.3 GiB
 out/target/product/waydroid_x86_64/vendor.img   # ext4，~0.8 GiB
 ```
 
-## 6. 装机验证
+## 6. 无 GApps
+
+默认清单 `02-waydroid-nogapps.xml` 不含 `vendor/gapps`、`vendor/gapps_tv`，因此产物天然没有
+Google 服务。若你本机自用想带上，把 `02-waydroid.xml` 换进去重新 sync 即可 —— 但**不要公开分发**
+那种镜像（Google 服务条款限制）。
+
+## 7. 装机验证
 
 ```sh
 sudo cp out/target/product/waydroid_x86_64/{system,vendor}.img /etc/waydroid-extra/images/
