@@ -10,8 +10,8 @@
 | 版本标识 | `AviumUI-16.2.2-waydroid_x86_64` |
 | Android | 16 (SDK 36)，`BP4A.260205.001` |
 | 架构 | x86_64（容器）/ 宿主 Linux x86_64 |
-| system.img | EROFS，2.11 GiB |
-| vendor.img | ext4，754 MiB |
+| system.img | EROFS，1.75 GiB（1,876,254,720 字节） |
+| vendor.img | ext4，754 MiB（790,847,488 字节） |
 | 上游 | `AviumUI/android_manifests` @ `avium-16.2` + WayDroid-ATV `lineage-23.2` 的 51 个补丁 |
 | 状态 | 可启动；Avium 桌面 / 设置 / 多窗口正常 |
 | GApps | **不含**（本项目的构建与分发配置为无 GApps） |
@@ -32,7 +32,17 @@ AviumUI 是 LineageOS 派生的中文定制 ROM。本项目把它"搬进"Waydroi
 
 ## 安装
 
-先在本地按 `docs/BUILD.md` 构建出 `system.img` / `vendor.img`，然后：
+镜像已发布在 [Releases](https://github.com/AconHol/aviumui-waydroid/releases/latest)（`system.img`、`vendor.img`、`SHA256SUMS`）。
+下载后：
+
+```sh
+mkdir -p images && mv system.img vendor.img SHA256SUMS images/
+git clone https://github.com/AconHol/aviumui-waydroid.git
+cd aviumui-waydroid
+./scripts/install.sh ./images
+```
+
+也可以自己按 `docs/BUILD.md` 构建（构建产物同样不含 GApps），再走同样的安装流程：
 
 ```sh
 git clone https://github.com/AconHol/aviumui-waydroid.git

@@ -3,8 +3,18 @@
 ## 前置
 
 - 已安装并初始化过 Waydroid（`waydroid init` 至少跑过一次），`waydroid-container` 服务可用
-- 磁盘剩余 ≥ 6 GiB（镜像 2.9 GiB + 解压/换镜像时的余量）
+- 磁盘剩余 ≥ 6 GiB（镜像 2.5 GiB + 换镜像时的余量）
 - 宿主为 x86_64 Linux
+
+## 下载
+
+从 [Releases](https://github.com/AconHol/aviumui-waydroid/releases/latest) 取 `system.img`、`vendor.img`、`SHA256SUMS`：
+
+```sh
+mkdir -p images && cd images
+gh release download --repo AconHol/aviumui-waydroid --pattern '*.img' --pattern 'SHA256SUMS'
+# 或直接从 release 页面下载后解压到 images/
+```
 
 ## 一键
 
