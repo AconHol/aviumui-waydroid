@@ -1,0 +1,1317 @@
+From 7b5edb0c99bec2660b441391da7afed219bd7959 Mon Sep 17 00:00:00 2001
+From: ruyue <ruyueee@outlook.com>
+Date: Tue, 27 Jan 2026 11:27:30 +0800
+Subject: [PATCH] FreeForm: inject freeform services
+
+Ruyue: adapt to a16 qpr2
+
+Co-authored-by: KindBrave <1773747161@qq.com>
+Co-authored-by: rmp22 <195054967+rmp22@users.noreply.github.com>
+Change-Id: Ie9243657f0b1d5b440873593e48850339a69778e
+---
+ core/java/android/app/FreeformLauncher.java   | 128 +++++++
+ .../android/app/IFreeformDisplayCallback.aidl |   9 +
+ .../android/app/IFreeformOverlayManager.aidl  |  23 ++
+ .../hardware/display/DisplayManager.java      |   7 +
+ .../display/DisplayManagerGlobal.java         |  11 +
+ .../display/DisplayManagerInternal.java       |  22 ++
+ .../hardware/display/IDisplayManager.aidl     |   2 +
+ core/java/android/view/IWindowSession.aidl    |   2 +
+ core/java/android/view/ViewRootImpl.java      |  10 +
+ core/java/android/view/WindowManager.java     |   5 +
+ .../android/view/WindowManagerGlobal.java     |  24 ++
+ core/java/android/view/WindowManagerImpl.java |   5 +
+ .../android/view/WindowManagerWrapper.java    |   5 +
+ .../android/view/WindowlessWindowManager.java |   4 +
+ ...splaySystemEventChipAnimationController.kt |   8 +-
+ .../server/display/DisplayManagerService.java | 133 +++++++
+ .../display/DisplayPowerController.java       |  11 +
+ .../display/MiFreeformDisplayAdapter.java     | 355 ++++++++++++++++++
+ .../com/android/server/wm/DisplayContent.java |   5 +
+ .../wm/FreeformOverlayManagerService.java     | 179 +++++++++
+ .../java/com/android/server/wm/Session.java   |  27 ++
+ .../server/wm/WindowManagerService.java       |  30 ++
+ .../java/com/android/server/SystemServer.java |   5 +
+ 23 files changed, 1008 insertions(+), 2 deletions(-)
+ create mode 100644 core/java/android/app/FreeformLauncher.java
+ create mode 100644 core/java/android/app/IFreeformDisplayCallback.aidl
+ create mode 100644 core/java/android/app/IFreeformOverlayManager.aidl
+ create mode 100644 services/core/java/com/android/server/display/MiFreeformDisplayAdapter.java
+ create mode 100644 services/core/java/com/android/server/wm/FreeformOverlayManagerService.java
+
+diff --git a/core/java/android/app/FreeformLauncher.java b/core/java/android/app/FreeformLauncher.java
+new file mode 100644
+index 0000000000000..49e1a7710a4e3
+--- /dev/null
++++ b/core/java/android/app/FreeformLauncher.java
+@@ -0,0 +1,128 @@
++/*
++ * Copyright (C) 2025 AxionOS
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package android.app;
++
++import android.os.IBinder;
++import android.os.ServiceManager;
++import android.util.Log;
++import android.view.Surface;
++
++/** @hide */
++public class FreeformLauncher {
++    private static final String TAG = "FreeformLauncher";
++    
++    private static IFreeformOverlayManager sService;
++    
++    private static IFreeformOverlayManager getService() {
++        if (sService == null) {
++            sService = IFreeformOverlayManager.Stub.asInterface(
++                ServiceManager.getService("freeform_overlay"));
++        }
++        return sService;
++    }
++
++    /** @hide */
++    public static void launch(String packageName) {
++        try {
++            IFreeformOverlayManager service = getService();
++            if (service != null) {
++                service.launchInFreeform(packageName);
++            }
++        } catch (Exception e) {
++            Log.e(TAG, "Failed to launch in freeform", e);
++        }
++    }
++
++    /** @hide */
++    @SuppressWarnings("ReferencesHidden")
++    public static void createFreeform(String name, IFreeformDisplayCallback callback,
++            int width, int height, int densityDpi, boolean secure,
++            boolean ownContentOnly, boolean shouldShowSystemDecorations, Surface surface,
++            float refreshRate, long presentationDeadlineNanos) {
++        try {
++            IFreeformOverlayManager service = getService();
++            if (service != null) {
++                service.createFreeform(name, callback, width, height, densityDpi, secure,
++                        ownContentOnly, shouldShowSystemDecorations, surface, refreshRate,
++                        presentationDeadlineNanos);
++            }
++        } catch (Exception e) {
++            Log.e(TAG, "Failed to create freeform display", e);
++        }
++    }
++
++    /** @hide */
++    public static void launchAppOnDisplay(String packageName, String activityName, 
++            int displayId, int userId) {
++        try {
++            IFreeformOverlayManager service = getService();
++            if (service != null) {
++                service.launchAppOnDisplay(packageName, activityName, displayId, userId);
++            }
++        } catch (Exception e) {
++            Log.e(TAG, "Failed to launch app on display", e);
++        }
++    }
++
++    /** @hide */
++    public static void pauseDisplay(int displayId) {
++        try {
++            IFreeformOverlayManager service = getService();
++            if (service != null) {
++                service.pauseDisplay(displayId);
++            }
++        } catch (Exception e) {
++            Log.e(TAG, "Failed to pause display", e);
++        }
++    }
++
++    /** @hide */
++    public static void resumeDisplay(int displayId) {
++        try {
++            IFreeformOverlayManager service = getService();
++            if (service != null) {
++                service.resumeDisplay(displayId);
++            }
++        } catch (Exception e) {
++            Log.e(TAG, "Failed to resume display", e);
++        }
++    }
++
++    /** @hide */
++    public static void resizeFreeform(IBinder appToken, int width, int height, 
++            int densityDpi) {
++        try {
++            IFreeformOverlayManager service = getService();
++            if (service != null) {
++                service.resizeFreeform(appToken, width, height, densityDpi);
++            }
++        } catch (Exception e) {
++            Log.e(TAG, "Failed to resize freeform display", e);
++        }
++    }
++
++    /** @hide */
++    public static void releaseFreeform(IBinder appToken) {
++        try {
++            IFreeformOverlayManager service = getService();
++            if (service != null) {
++                service.releaseFreeform(appToken);
++            }
++        } catch (Exception e) {
++            Log.e(TAG, "Failed to release freeform display", e);
++        }
++    }
++}
+\ No newline at end of file
+diff --git a/core/java/android/app/IFreeformDisplayCallback.aidl b/core/java/android/app/IFreeformDisplayCallback.aidl
+new file mode 100644
+index 0000000000000..4c3507441bb4a
+--- /dev/null
++++ b/core/java/android/app/IFreeformDisplayCallback.aidl
+@@ -0,0 +1,9 @@
++package android.app;
++
++/** {@hide} */
++oneway interface IFreeformDisplayCallback {
++    void onDisplayAdd(int displayId);
++    void onDisplayPaused();
++    void onDisplayResumed();
++    void onDisplayStopped();
++}
+diff --git a/core/java/android/app/IFreeformOverlayManager.aidl b/core/java/android/app/IFreeformOverlayManager.aidl
+new file mode 100644
+index 0000000000000..f45da1f0b0cc0
+--- /dev/null
++++ b/core/java/android/app/IFreeformOverlayManager.aidl
+@@ -0,0 +1,23 @@
++package android.app;
++
++import android.app.IFreeformDisplayCallback;
++import android.view.Surface;
++
++/** {@hide} */
++interface IFreeformOverlayManager {
++    void launchInFreeform(String packageName);
++    
++    void createFreeform(String name, IFreeformDisplayCallback callback,
++            int width, int height, int densityDpi, boolean secure,
++            boolean ownContentOnly, boolean shouldShowSystemDecorations, in Surface surface,
++            float refreshRate, long presentationDeadlineNanos);
++
++    void pauseDisplay(int displayId);
++    void resumeDisplay(int displayId);
++
++    void launchAppOnDisplay(String packageName, String activityName, int displayId, int userId);
++
++    void resizeFreeform(IBinder appToken, int width, int height, int densityDpi);
++
++    void releaseFreeform(IBinder appToken);
++}
+diff --git a/core/java/android/hardware/display/DisplayManager.java b/core/java/android/hardware/display/DisplayManager.java
+index 16e912a1a1d46..b0a7521a2da44 100644
+--- a/core/java/android/hardware/display/DisplayManager.java
++++ b/core/java/android/hardware/display/DisplayManager.java
+@@ -2085,6 +2085,13 @@ public void setDisplayTopology(DisplayTopology topology) {
+         mGlobal.setDisplayTopology(topology);
+     }
+ 
++    /**
++     * @hide
++     */
++    public boolean isFreeformDisplayId(int displayId) {
++        return mGlobal.isFreeformDisplayId(displayId);
++    }
++
+     /**
+      * Register a listener to receive display topology updates.
+      * @param executor The executor specifying the thread on which the callbacks will be invoked
+diff --git a/core/java/android/hardware/display/DisplayManagerGlobal.java b/core/java/android/hardware/display/DisplayManagerGlobal.java
+index b9a45d825f12d..2471b0702a9cb 100644
+--- a/core/java/android/hardware/display/DisplayManagerGlobal.java
++++ b/core/java/android/hardware/display/DisplayManagerGlobal.java
+@@ -1475,6 +1475,17 @@ public void setDisplayTopology(DisplayTopology topology) {
+         }
+     }
+ 
++    /**
++     * @hide
++     */
++    public boolean isFreeformDisplayId(int displayId) {
++        try {
++            return mDm.isFreeformDisplayId(displayId);
++        } catch (RemoteException ex) {
++            throw ex.rethrowFromSystemServer();
++        }
++    }
++
+     /**
+      * @see DisplayManager#registerTopologyListener
+      */
+diff --git a/core/java/android/hardware/display/DisplayManagerInternal.java b/core/java/android/hardware/display/DisplayManagerInternal.java
+index 2174513c83e56..7547c12d41071 100644
+--- a/core/java/android/hardware/display/DisplayManagerInternal.java
++++ b/core/java/android/hardware/display/DisplayManagerInternal.java
+@@ -19,11 +19,13 @@
+ import android.annotation.FloatRange;
+ import android.annotation.IntDef;
+ import android.annotation.Nullable;
++import android.app.IFreeformDisplayCallback;
+ import android.companion.virtual.IVirtualDevice;
+ import android.graphics.Point;
+ import android.hardware.SensorManager;
+ import android.hardware.input.HostUsiVersion;
+ import android.os.Handler;
++import android.os.IBinder;
+ import android.os.PowerManager;
+ import android.util.IntArray;
+ import android.util.SparseArray;
+@@ -47,6 +49,26 @@
+  * @hide Only for use within the system server.
+  */
+ public abstract class DisplayManagerInternal {
++    public abstract void createFreeformDisplay(String name, IFreeformDisplayCallback callback,
++            int width, int height, int densityDpi, boolean secure,
++            boolean ownContentOnly, boolean shouldShowSystemDecorations, android.view.Surface surface,
++            float refreshRate, long presentationDeadlineNanos);
++    
++    public abstract void pauseFreeformDisplay(int displayId);
++    
++    public abstract void resumeFreeformDisplay(int displayId);
++    
++    public abstract void resizeFreeform(IBinder appToken, int width, int height, int densityDpi);
++    
++    public abstract void releaseFreeform(IBinder appToken);
++    
++    public abstract int getDisplayIdForFreeformToken(IBinder appToken);
++    
++    public abstract boolean isFreeformDisplayId(int displayId);
++    
++    public abstract void pauseAllFreeformDisplays();
++    
++    public abstract void resumeAllFreeformDisplays();
+ 
+     @IntDef(prefix = {"REFRESH_RATE_LIMIT_"}, value = {
+             REFRESH_RATE_LIMIT_HIGH_BRIGHTNESS_MODE
+diff --git a/core/java/android/hardware/display/IDisplayManager.aidl b/core/java/android/hardware/display/IDisplayManager.aidl
+index aa95d98de3888..80669314c83b2 100644
+--- a/core/java/android/hardware/display/IDisplayManager.aidl
++++ b/core/java/android/hardware/display/IDisplayManager.aidl
+@@ -282,4 +282,6 @@ interface IDisplayManager {
+     // Set the display topology
+     @EnforcePermission("MANAGE_DISPLAYS")
+     void setDisplayTopology(in DisplayTopology topology);
++
++    boolean isFreeformDisplayId(int displayId);
+ }
+diff --git a/core/java/android/view/IWindowSession.aidl b/core/java/android/view/IWindowSession.aidl
+index c26611c3b8e1c..9a48d4e4159ad 100644
+--- a/core/java/android/view/IWindowSession.aidl
++++ b/core/java/android/view/IWindowSession.aidl
+@@ -374,4 +374,6 @@ interface IWindowSession {
+      */
+     oneway void notifyImeWindowVisibilityChangedFromClient(IWindow window, boolean visible,
+             in ImeTracker.Token statsToken);
++    
++    oneway void bringToFront(IWindow window);
+ }
+diff --git a/core/java/android/view/ViewRootImpl.java b/core/java/android/view/ViewRootImpl.java
+index fa1c190eb4e2b..29b8f0a226014 100644
+--- a/core/java/android/view/ViewRootImpl.java
++++ b/core/java/android/view/ViewRootImpl.java
+@@ -12988,6 +12988,16 @@ public void setTouchableRegion(Region r) {
+     IWindowSession getWindowSession() {
+         return mWindowSession;
+     }
++    
++    /**
++     * @hide
++     */
++    public void bringToFront() {
++        try {
++            mWindowSession.bringToFront(mWindow);
++        } catch (RemoteException e) {
++        }
++    }
+ 
+     private void registerCallbacksForSync(boolean syncBuffer,
+             final SurfaceSyncGroup surfaceSyncGroup) {
+diff --git a/core/java/android/view/WindowManager.java b/core/java/android/view/WindowManager.java
+index 647d50a2971e6..43ed43bd621f0 100644
+--- a/core/java/android/view/WindowManager.java
++++ b/core/java/android/view/WindowManager.java
+@@ -729,6 +729,11 @@ public InvalidDisplayException(String name) {
+      * @param view The view to be removed.
+      */
+     public void removeViewImmediate(View view);
++    
++    /**
++     * @hide
++     */
++    public void bringViewToFront(@NonNull View view);
+ 
+     /**
+      * Returns the {@link WindowMetrics} according to the current system state.
+diff --git a/core/java/android/view/WindowManagerGlobal.java b/core/java/android/view/WindowManagerGlobal.java
+index a64e9fa56993b..7a3568c15501a 100644
+--- a/core/java/android/view/WindowManagerGlobal.java
++++ b/core/java/android/view/WindowManagerGlobal.java
+@@ -520,6 +520,30 @@ public void updateViewLayout(View view, ViewGroup.LayoutParams params) {
+             root.setLayoutParams(wparams, false);
+         }
+     }
++    
++    public void bringViewToFront(View view) {
++        if (view == null) {
++            return;
++        }
++        
++        synchronized (mLock) {
++            int index = findViewLocked(view, true);
++            if (index < 0) return;
++            
++            ViewRootImpl root = mRoots.get(index);
++            WindowManager.LayoutParams wparams = mParams.get(index);
++            
++            mViews.remove(index);
++            mRoots.remove(index);
++            mParams.remove(index);
++            
++            mViews.add(view);
++            mRoots.add(root);
++            mParams.add(wparams);
++            
++            root.bringToFront();
++        }
++    }
+ 
+     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
+     public void removeView(View view, boolean immediate) {
+diff --git a/core/java/android/view/WindowManagerImpl.java b/core/java/android/view/WindowManagerImpl.java
+index 02cd94fc046d1..321e3aebcb4ce 100644
+--- a/core/java/android/view/WindowManagerImpl.java
++++ b/core/java/android/view/WindowManagerImpl.java
+@@ -253,6 +253,11 @@ public void removeView(View view) {
+     public void removeViewImmediate(View view) {
+         mGlobal.removeView(view, true);
+     }
++    
++    @Override
++    public void bringViewToFront(@NonNull View view) {
++        mGlobal.bringViewToFront(view);
++    }
+ 
+     @Override
+     public void requestAppKeyboardShortcuts(
+diff --git a/core/java/android/view/WindowManagerWrapper.java b/core/java/android/view/WindowManagerWrapper.java
+index d7b9f88f1cadb..426a51a29dad3 100644
+--- a/core/java/android/view/WindowManagerWrapper.java
++++ b/core/java/android/view/WindowManagerWrapper.java
+@@ -84,6 +84,11 @@ public void removeViewImmediate(View view) {
+         mBase.removeViewImmediate(view);
+     }
+ 
++    @Override
++    public void bringViewToFront(View view) {
++        mBase.bringViewToFront(view);
++    }
++
+     @NonNull
+     @Override
+     public WindowMetrics getCurrentWindowMetrics() {
+diff --git a/core/java/android/view/WindowlessWindowManager.java b/core/java/android/view/WindowlessWindowManager.java
+index 410a0239223bf..691dc6f47529f 100644
+--- a/core/java/android/view/WindowlessWindowManager.java
++++ b/core/java/android/view/WindowlessWindowManager.java
+@@ -716,6 +716,10 @@ public boolean moveFocusToAdjacentWindow(IWindow fromWindow, @FocusDirection int
+     public void notifyImeWindowVisibilityChangedFromClient(IWindow window, boolean visible,
+             @NonNull ImeTracker.Token statsToken) {
+     }
++    
++    @Override
++    public void bringToFront(IWindow window) {
++    }
+ 
+     void setParentInterface(@Nullable ISurfaceControlViewHostParent parentInterface) {
+         IBinder oldInterface = mParentInterface == null ? null : mParentInterface.asBinder();
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/events/MultiDisplaySystemEventChipAnimationController.kt b/packages/SystemUI/src/com/android/systemui/statusbar/events/MultiDisplaySystemEventChipAnimationController.kt
+index b881c920c34b5..0cfb8bf1249c3 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/events/MultiDisplaySystemEventChipAnimationController.kt
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/events/MultiDisplaySystemEventChipAnimationController.kt
+@@ -71,6 +71,10 @@ constructor(
+         controllersForAllDisplays().forEach { consumer(it) }
+     }
+ 
+-    private fun controllersForAllDisplays() =
+-        displayRepository.displays.value.mapNotNull { controllerStore.forDisplay(it.displayId) }
++    private fun controllersForAllDisplays(): List<SystemEventChipAnimationController> {
++        val displayIdsWithDecorations = displayRepository.displayIdsWithSystemDecorations.value
++        return displayRepository.displays.value
++            .filter { it.displayId in displayIdsWithDecorations }
++            .mapNotNull { controllerStore.forDisplay(it.displayId) }
++    }
+ }
+diff --git a/services/core/java/com/android/server/display/DisplayManagerService.java b/services/core/java/com/android/server/display/DisplayManagerService.java
+index ed92dd7ef5764..a057ace31e4ae 100644
+--- a/services/core/java/com/android/server/display/DisplayManagerService.java
++++ b/services/core/java/com/android/server/display/DisplayManagerService.java
+@@ -530,6 +530,7 @@ public synchronized void requestDisplayState(int displayId, int state, float bri
+     private final Spline mMinimumBrightnessSpline;
+     private final ColorSpace mWideColorSpace;
+     private final OverlayProperties mOverlayProperties;
++    private MiFreeformDisplayAdapter mMiFreeformDisplayAdapter;
+ 
+     private SensorManager mSensorManager;
+     private BrightnessTracker mBrightnessTracker;
+@@ -2386,6 +2387,7 @@ private void registerAdditionalDisplayAdapters() {
+             if (shouldRegisterNonEssentialDisplayAdaptersLocked()) {
+                 registerOverlayDisplayAdapterLocked();
+                 registerWifiDisplayAdapterLocked();
++                registerMiFreeformDisplayAdapterLocked();
+             }
+         }
+     }
+@@ -2406,6 +2408,12 @@ private void registerWifiDisplayAdapterLocked() {
+         }
+     }
+ 
++    private void registerMiFreeformDisplayAdapterLocked() {
++        mMiFreeformDisplayAdapter = new MiFreeformDisplayAdapter(
++                mSyncRoot, mContext, mHandler, mDisplayDeviceRepo, mLogicalDisplayMapper, mFlags);
++        registerDisplayAdapterLocked(mMiFreeformDisplayAdapter);
++    }
++
+     private boolean shouldRegisterNonEssentialDisplayAdaptersLocked() {
+         // In safe mode, we disable non-essential display adapters to give the user
+         // an opportunity to fix broken settings or other problems that might affect
+@@ -5838,6 +5846,19 @@ public void setDisplayTopology(DisplayTopology topology) {
+                 mDisplayTopologyCoordinator.setTopology(topology);
+             }
+         }
++
++        @Override // Binder call
++        public boolean isFreeformDisplayId(int displayId) {
++            final long token = Binder.clearCallingIdentity();
++            try {
++                synchronized (mSyncRoot) {
++                    return mMiFreeformDisplayAdapter != null
++                            && mMiFreeformDisplayAdapter.isFreeformDisplayIdLocked(displayId);
++                }
++            } finally {
++                Binder.restoreCallingIdentity(token);
++            }
++        }
+     }
+ 
+     @VisibleForTesting
+@@ -5863,6 +5884,118 @@ public void initPowerManagement(final DisplayPowerCallbacks callbacks, Handler h
+             mHandler.sendEmptyMessage(MSG_LOAD_BRIGHTNESS_CONFIGURATIONS);
+         }
+ 
++        @Override
++        public void createFreeformDisplay(String name, android.app.IFreeformDisplayCallback callback,
++                int width, int height, int densityDpi, boolean secure,
++                boolean ownContentOnly, boolean shouldShowSystemDecorations, android.view.Surface surface,
++                float refreshRate, long presentationDeadlineNanos) {
++            synchronized (mSyncRoot) {
++                if (mMiFreeformDisplayAdapter != null) {
++                    mMiFreeformDisplayAdapter.createFreeformLocked(name, callback, width, height,
++                            densityDpi, secure, ownContentOnly, shouldShowSystemDecorations, surface,
++                            refreshRate, presentationDeadlineNanos);
++                }
++            }
++        }
++        
++        @Override
++        public void pauseFreeformDisplay(int displayId) {
++            synchronized (mSyncRoot) {
++                LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
++                if (display != null) {
++                    DisplayDevice device = display.getPrimaryDisplayDeviceLocked();
++                    if (device != null) {
++                        device.requestDisplayStateLocked(Display.STATE_OFF, 0f, 0f, null);
++                    }
++                }
++            }
++        }
++        
++        @Override
++        public void resumeFreeformDisplay(int displayId) {
++            synchronized (mSyncRoot) {
++                LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
++                if (display != null) {
++                    DisplayDevice device = display.getPrimaryDisplayDeviceLocked();
++                    if (device != null) {
++                        device.requestDisplayStateLocked(Display.STATE_ON, 1.0f, 1.0f, null);
++                    }
++                }
++            }
++        }
++        
++        @Override
++        public void resizeFreeform(IBinder appToken, int width, int height, int densityDpi) {
++            synchronized (mSyncRoot) {
++                if (mMiFreeformDisplayAdapter != null) {
++                    mMiFreeformDisplayAdapter.resizeFreeform(appToken, width, height, densityDpi);
++                }
++            }
++        }
++        
++        @Override
++        public void releaseFreeform(IBinder appToken) {
++            synchronized (mSyncRoot) {
++                if (mMiFreeformDisplayAdapter != null) {
++                    mMiFreeformDisplayAdapter.releaseFreeform(appToken);
++                }
++            }
++        }
++        
++        @Override
++        public int getDisplayIdForFreeformToken(IBinder appToken) {
++            if (mMiFreeformDisplayAdapter != null) {
++                return mMiFreeformDisplayAdapter.getDisplayIdForToken(appToken);
++            }
++            return -1;
++        }
++        
++        @Override
++        public boolean isFreeformDisplayId(int displayId) {
++            if (mMiFreeformDisplayAdapter != null) {
++                return mMiFreeformDisplayAdapter.isFreeformDisplayIdLocked(displayId);
++            }
++            return false;
++        }
++        
++        @Override
++        public void pauseAllFreeformDisplays() {
++            synchronized (mSyncRoot) {
++                if (mMiFreeformDisplayAdapter != null) {
++                    List<Integer> displayIds = mMiFreeformDisplayAdapter.getAllFreeformDisplayIdsLocked();
++                    for (int displayId : displayIds) {
++                        LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
++                        if (display != null) {
++                            DisplayDevice device = display.getPrimaryDisplayDeviceLocked();
++                            if (device != null) {
++                                device.requestDisplayStateLocked(Display.STATE_OFF, 0f, 0f, null);
++                            }
++                        }
++                    }
++                    Slog.d(TAG, "Paused " + displayIds.size() + " freeform displays");
++                }
++            }
++        }
++        
++        @Override
++        public void resumeAllFreeformDisplays() {
++            synchronized (mSyncRoot) {
++                if (mMiFreeformDisplayAdapter != null) {
++                    List<Integer> displayIds = mMiFreeformDisplayAdapter.getAllFreeformDisplayIdsLocked();
++                    for (int displayId : displayIds) {
++                        LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
++                        if (display != null) {
++                            DisplayDevice device = display.getPrimaryDisplayDeviceLocked();
++                            if (device != null) {
++                                device.requestDisplayStateLocked(Display.STATE_ON, 1.0f, 1.0f, null);
++                            }
++                        }
++                    }
++                    Slog.d(TAG, "Resumed " + displayIds.size() + " freeform displays");
++                }
++            }
++        }
++
+         @Override
+         public int createVirtualDisplay(VirtualDisplayConfig config,
+                 IVirtualDisplayCallback callback, IVirtualDevice virtualDevice,
+diff --git a/services/core/java/com/android/server/display/DisplayPowerController.java b/services/core/java/com/android/server/display/DisplayPowerController.java
+index e1f13b9f74173..e7d0cd8aca568 100644
+--- a/services/core/java/com/android/server/display/DisplayPowerController.java
++++ b/services/core/java/com/android/server/display/DisplayPowerController.java
+@@ -2298,6 +2298,17 @@ private boolean setScreenState(int state, @Display.StateReason int reason, boole
+             Slog.i(TAG, "Window Manager Policy screenTurningOn complete");
+         }
+ 
++        if (mDisplayId == Display.DEFAULT_DISPLAY) {
++            DisplayManagerInternal dmi = LocalServices.getService(DisplayManagerInternal.class);
++            if (dmi != null) {
++                if (isOff) {
++                    dmi.pauseAllFreeformDisplays();
++                } else if (isOn) {
++                    dmi.resumeAllFreeformDisplays();
++                }
++            }
++        }
++
+         // Return true if the screen isn't blocked.
+         return mPendingScreenOnUnblocker == null
+                 && mPendingScreenOnUnblockerByDisplayOffload == null;
+diff --git a/services/core/java/com/android/server/display/MiFreeformDisplayAdapter.java b/services/core/java/com/android/server/display/MiFreeformDisplayAdapter.java
+new file mode 100644
+index 0000000000000..83d7233781a13
+--- /dev/null
++++ b/services/core/java/com/android/server/display/MiFreeformDisplayAdapter.java
+@@ -0,0 +1,355 @@
++/*
++ * Copyright (C) 2025 AxionOS
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.android.server.display;
++
++import android.app.IFreeformDisplayCallback;
++import android.content.Context;
++import android.os.Handler;
++import android.os.IBinder;
++import android.os.Message;
++import android.os.RemoteException;
++import android.util.ArrayMap;
++import android.util.Slog;
++import android.view.Display;
++import android.view.Surface;
++import android.view.SurfaceControl;
++
++import com.android.server.display.feature.DisplayManagerFlags;
++import com.android.server.display.DisplayModeFactory;
++
++import java.util.ArrayList;
++import java.util.List;
++
++public class MiFreeformDisplayAdapter extends DisplayAdapter {
++    private static final String TAG = "MiFreeformDisplayAdapter";
++
++    private final ArrayMap<IBinder, FreeformDisplayDevice> mFreeformDisplayDevices = new ArrayMap<>();
++    private final LogicalDisplayMapper mLogicalDisplayMapper;
++
++    public MiFreeformDisplayAdapter(DisplayManagerService.SyncRoot syncRoot,
++            Context context, Handler handler, Listener listener, 
++            LogicalDisplayMapper logicalDisplayMapper, DisplayManagerFlags flags) {
++        super(syncRoot, context, handler, listener, TAG, flags);
++        mLogicalDisplayMapper = logicalDisplayMapper;
++    }
++    
++    public void createFreeformLocked(String name, IFreeformDisplayCallback callback,
++            int width, int height, int densityDpi, boolean secure,
++            boolean ownContentOnly, boolean shouldShowSystemDecorations, Surface surface,
++            float refreshRate, long presentationDeadlineNanos) {
++        
++        IBinder appToken = callback.asBinder();
++        Slog.i(TAG, "createFreeformLocked: token=" + appToken + 
++               ", ownContentOnly=" + ownContentOnly +
++               ", shouldShowSystemDecorations=" + shouldShowSystemDecorations);
++        
++        if (mFreeformDisplayDevices.containsKey(appToken)) {
++            Slog.w(TAG, "Display already exists for this token");
++            return;
++        }
++        
++        IBinder displayToken = DisplayControl.createVirtualDisplay(name, true);
++        FreeformDisplayDevice device = new FreeformDisplayDevice(displayToken, name, width, height,
++                densityDpi, refreshRate, presentationDeadlineNanos,
++                new FreeformFlags(true, true /* ownContentOnly */, false /* shouldShowSystemDecorations */),
++                surface, new Callback(callback, getHandler()), appToken);
++
++        mFreeformDisplayDevices.put(appToken, device);
++        
++        sendDisplayDeviceEventLocked(device, DISPLAY_DEVICE_EVENT_ADDED);
++        
++        try {
++            appToken.linkToDeath(device, 0);
++        } catch (RemoteException e) {
++            Slog.e(TAG, "Failed to link death recipient", e);
++            mFreeformDisplayDevices.remove(appToken);
++            device.destroyLocked(false);
++            return;
++        }
++        
++        getHandler().postDelayed(() -> {
++            synchronized (getSyncRoot()) {
++                LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(device);
++                Slog.i(TAG, "findLogicalDisplayForDevice: " + display);
++                try {
++                    if (display != null) {
++                        device.notifyDisplayReady(display.getDisplayIdLocked());
++                    } else {
++                        Slog.e(TAG, "Failed to find logical display for device");
++                    }
++                } catch (Exception e) {
++                    Slog.e(TAG, "Error notifying display added", e);
++                }
++            }
++        }, 500);
++    }
++    
++    public void resizeFreeform(IBinder appToken, int width, int height, int densityDpi) {
++        synchronized (getSyncRoot()) {
++            FreeformDisplayDevice device = mFreeformDisplayDevices.get(appToken);
++            if (device != null) {
++                device.resizeLocked(width, height, densityDpi);
++                Slog.i(TAG, "Resized freeform display: " + width + "x" + height + " @ " + densityDpi + "dpi");
++            } else {
++                Slog.w(TAG, "resizeFreeform: Device not found for token " + appToken);
++            }
++        }
++    }
++    
++    public void releaseFreeform(IBinder appToken) {
++        synchronized (getSyncRoot()) {
++            Slog.i(TAG, "releaseFreeform: token=" + appToken + 
++                   ", devices in map: " + mFreeformDisplayDevices.size());
++            FreeformDisplayDevice device = mFreeformDisplayDevices.remove(appToken);
++            if (device != null) {
++                device.destroyLocked(true);
++                appToken.unlinkToDeath(device, 0);
++                sendDisplayDeviceEventLocked(device, DISPLAY_DEVICE_EVENT_REMOVED);
++                Slog.i(TAG, "Released freeform display for token " + appToken);
++            } else {
++                Slog.w(TAG, "releaseFreeform: Device not found for token " + appToken +
++                       ". Available tokens: " + mFreeformDisplayDevices.keySet());
++            }
++        }
++    }
++    
++    private void handleBinderDiedLocked(IBinder appToken) {
++        FreeformDisplayDevice device = mFreeformDisplayDevices.remove(appToken);
++        if (device != null) {
++            Slog.w(TAG, "Client died, auto-releasing freeform display");
++        }
++    }
++    
++    public List<Integer> getAllFreeformDisplayIdsLocked() {
++        List<Integer> displayIds = new ArrayList<>();
++        for (FreeformDisplayDevice device : mFreeformDisplayDevices.values()) {
++            LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(device);
++            if (display != null) {
++                displayIds.add(display.getDisplayIdLocked());
++            }
++        }
++        return displayIds;
++    }
++    
++    public int getDisplayIdForToken(IBinder appToken) {
++        synchronized (getSyncRoot()) {
++            FreeformDisplayDevice device = mFreeformDisplayDevices.get(appToken);
++            if (device != null) {
++                LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(device);
++                if (display != null) {
++                    return display.getDisplayIdLocked();
++                }
++            }
++            return -1;
++        }
++    }
++    
++    public boolean isFreeformDisplayIdLocked(int displayId) {
++        for (FreeformDisplayDevice device : mFreeformDisplayDevices.values()) {
++            LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(device);
++            if (display != null && display.getDisplayIdLocked() == displayId) {
++                return true;
++            }
++        }
++        return false;
++    }
++
++    private class FreeformDisplayDevice extends DisplayDevice implements IBinder.DeathRecipient {
++        private static final int PENDING_SURFACE_CHANGE = 0x01;
++        private static final int PENDING_RESIZE = 0x02;
++        
++        private final String mName;
++        private final float mRefreshRate;
++        private final long mDisplayPresentationDeadlineNanos;
++        private FreeformFlags mFlags;
++        private Surface mSurface;
++        private int mWidth;
++        private int mHeight;
++        private int mDensityDpi;
++        private Display.Mode mMode;
++        private final Callback mCallback;
++        private final IBinder mAppToken;
++        private DisplayDeviceInfo mInfo;
++        private int mPendingChanges;
++
++        public FreeformDisplayDevice(IBinder displayToken, String uniqueId,
++                int width, int height, int density,
++                float refreshRate, long presentationDeadlineNanos,
++                FreeformFlags flags,
++                Surface surface, Callback callback, IBinder appToken) {
++            super(MiFreeformDisplayAdapter.this, displayToken, uniqueId, getContext());
++            mName = uniqueId;
++            mRefreshRate = refreshRate;
++            mDisplayPresentationDeadlineNanos = presentationDeadlineNanos;
++            mFlags = flags;
++            mSurface = surface;
++            mWidth = width;
++            mHeight = height;
++            mDensityDpi = density;
++            mMode = DisplayModeFactory.createMode(mWidth, mHeight, refreshRate);
++            mCallback = callback;
++            mAppToken = appToken;
++            mPendingChanges |= PENDING_SURFACE_CHANGE;
++        }
++        
++        public void resizeLocked(int width, int height, int densityDpi) {
++            if (mWidth != width || mHeight != height || mDensityDpi != densityDpi) {
++                mWidth = width;
++                mHeight = height;
++                mDensityDpi = densityDpi;
++                mMode = DisplayModeFactory.createMode(width, height, mRefreshRate);
++                mInfo = null;
++                mPendingChanges |= PENDING_RESIZE;
++                sendDisplayDeviceEventLocked(this, DISPLAY_DEVICE_EVENT_CHANGED);
++                sendTraversalRequestLocked();
++            }
++        }
++        
++        public void destroyLocked(boolean binderAlive) {
++            if (mSurface != null) {
++                mSurface.release();
++                mSurface = null;
++            }
++            DisplayControl.destroyVirtualDisplay(getDisplayTokenLocked());
++            if (binderAlive) {
++                mCallback.dispatchDisplayStopped();
++            }
++        }
++        
++        @Override
++        public void binderDied() {
++            synchronized (getSyncRoot()) {
++                handleBinderDiedLocked(mAppToken);
++                Slog.w(TAG, "Freeform display client died: " + mAppToken);
++                destroyLocked(false);
++                sendDisplayDeviceEventLocked(this, DISPLAY_DEVICE_EVENT_REMOVED);
++            }
++        }
++
++        @Override
++        public boolean hasStableUniqueId() {
++            return false;
++        }
++
++        @Override
++        public void configureSurfaceLocked(SurfaceControl.Transaction t) {
++            if ((mPendingChanges & PENDING_SURFACE_CHANGE) != 0) {
++                setSurfaceLocked(t, mSurface);
++                mPendingChanges &= ~PENDING_SURFACE_CHANGE;
++            }
++        }
++
++        @Override
++        public void configureDisplaySizeLocked(SurfaceControl.Transaction t) {
++            if ((mPendingChanges & PENDING_RESIZE) != 0) {
++                setDisplaySizeLocked(t, mWidth, mHeight);
++                mPendingChanges &= ~PENDING_RESIZE;
++            }
++        }
++         
++        public void notifyDisplayReady(int displayId) {
++            mCallback.obtainMessage(Callback.MSG_ON_DISPLAY_ADD, displayId, 0).sendToTarget();
++        }
++
++        @Override
++        public DisplayDeviceInfo getDisplayDeviceInfoLocked() {
++            if (mInfo == null) {
++                mInfo = new DisplayDeviceInfo();
++                mInfo.name = mName;
++                mInfo.uniqueId = getUniqueId();
++                mInfo.width = mWidth;
++                mInfo.height = mHeight;
++                mInfo.modeId = mMode.getModeId();
++                mInfo.defaultModeId = mMode.getModeId();
++                mInfo.supportedModes = new Display.Mode[] { mMode };
++                mInfo.densityDpi = mDensityDpi;
++                mInfo.xDpi = mDensityDpi;
++                mInfo.yDpi = mDensityDpi;
++                mInfo.presentationDeadlineNanos = mDisplayPresentationDeadlineNanos +
++                        1000000000L / (int) mRefreshRate;
++                mInfo.type = Display.TYPE_VIRTUAL;
++                mInfo.touch = DisplayDeviceInfo.TOUCH_VIRTUAL;
++                mInfo.flags = 0;
++                if (mFlags.mSecure) {
++                    mInfo.flags |= DisplayDeviceInfo.FLAG_SECURE;
++                }
++                mInfo.flags |= DisplayDeviceInfo.FLAG_OWN_CONTENT_ONLY;
++                mInfo.flags |= DisplayDeviceInfo.FLAG_ALWAYS_UNLOCKED;
++                mInfo.flags |= DisplayDeviceInfo.FLAG_TRUSTED;
++            }
++            return mInfo;
++        }
++    }
++
++    private static final class FreeformFlags {
++        final boolean mSecure;
++        final boolean mOwnContentOnly;
++        final boolean mShouldShowSystemDecorations = false;
++
++        FreeformFlags(boolean secure, boolean ownContentOnly, boolean shouldShowSystemDecorations) {
++            mSecure = secure;
++            mOwnContentOnly = ownContentOnly;
++        }
++    }
++
++    private static class Callback extends Handler {
++        private static final int MSG_ON_DISPLAY_ADD = 3;
++        private static final int MSG_ON_DISPLAY_PAUSED = 0;
++        private static final int MSG_ON_DISPLAY_RESUMED = 1;
++        private static final int MSG_ON_DISPLAY_STOPPED = 2;
++
++        private final IFreeformDisplayCallback mCallback;
++
++        public Callback(IFreeformDisplayCallback callback, Handler handler) {
++            super(handler.getLooper());
++            mCallback = callback;
++        }
++
++        @Override
++        public void handleMessage(Message msg) {
++            try {
++                switch (msg.what) {
++                    case MSG_ON_DISPLAY_ADD:
++                        mCallback.onDisplayAdd(msg.arg1);
++                        break;
++                    case MSG_ON_DISPLAY_PAUSED:
++                        mCallback.onDisplayPaused();
++                        break;
++                    case MSG_ON_DISPLAY_RESUMED:
++                        mCallback.onDisplayResumed();
++                        break;
++                    case MSG_ON_DISPLAY_STOPPED:
++                        mCallback.onDisplayStopped();
++                        break;
++                }
++            } catch (RemoteException e) {
++                Slog.e(TAG, "Failed to notify callback", e);
++            }
++        }
++        
++        public void dispatchDisplayPaused() {
++            sendEmptyMessage(MSG_ON_DISPLAY_PAUSED);
++        }
++        
++        public void dispatchDisplayResumed() {
++            sendEmptyMessage(MSG_ON_DISPLAY_RESUMED);
++        }
++        
++        public void dispatchDisplayStopped() {
++            sendEmptyMessage(MSG_ON_DISPLAY_STOPPED);
++        }
++    }
++}
+diff --git a/services/core/java/com/android/server/wm/DisplayContent.java b/services/core/java/com/android/server/wm/DisplayContent.java
+index 27427724f0c3e..fbcfe958a6f41 100644
+--- a/services/core/java/com/android/server/wm/DisplayContent.java
++++ b/services/core/java/com/android/server/wm/DisplayContent.java
+@@ -5743,6 +5743,11 @@ private boolean shouldNeverShowSystemDecorations() {
+             // Do not show system decorations on untrusted virtual display.
+             return true;
+         }
++        // Freeform displays are isolated app containers that should not run sysui components
++        if (mWmService.mDisplayManagerInternal != null
++                && mWmService.mDisplayManagerInternal.isFreeformDisplayId(mDisplayId)) {
++            return true;
++        }
+         return false;
+     }
+ 
+diff --git a/services/core/java/com/android/server/wm/FreeformOverlayManagerService.java b/services/core/java/com/android/server/wm/FreeformOverlayManagerService.java
+new file mode 100644
+index 0000000000000..80e0333bd4ab9
+--- /dev/null
++++ b/services/core/java/com/android/server/wm/FreeformOverlayManagerService.java
+@@ -0,0 +1,179 @@
++/*
++ * Copyright (C) 2025 AxionOS
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.android.server.wm;
++
++import android.app.ActivityOptions;
++import android.app.ActivityTaskManager;
++import android.app.IActivityTaskManager;
++import android.app.IFreeformDisplayCallback;
++import android.app.IFreeformOverlayManager;
++import android.content.Context;
++import android.content.Intent;
++import android.hardware.display.DisplayManagerInternal;
++import android.os.Binder;
++import android.os.IBinder;
++import android.os.RemoteException;
++import android.os.UserHandle;
++import android.util.Slog;
++import android.view.Display;
++import android.view.Surface;
++import com.android.server.LocalServices;
++import com.android.server.SystemService;
++
++import java.util.List;
++
++public class FreeformOverlayManagerService extends SystemService {
++    private static final String TAG = "FreeformOverlayManager";
++    
++    private final FreeformOverlayManagerImpl mService = new FreeformOverlayManagerImpl();
++
++    public FreeformOverlayManagerService(Context context) {
++        super(context);
++    }
++
++    @Override
++    public void onStart() {
++        publishBinderService("freeform_overlay", mService);
++    }
++
++    private final class FreeformOverlayManagerImpl extends IFreeformOverlayManager.Stub {
++        private static final String EDGE_SERVICE_PACKAGE = "com.android.edge.bar";
++        private static final String EDGE_SERVICE_CLASS = "com.android.edge.bar.EdgeService";
++        private static final String ACTION_LAUNCH_FREEFORM = "com.android.edge.bar.ACTION_LAUNCH_FREEFORM";
++        private static final String EXTRA_PACKAGE_NAME = "package_name";
++        
++        @Override
++        public void launchInFreeform(String packageName) {
++            final long token = Binder.clearCallingIdentity();
++            try {
++                Intent intent = new Intent(ACTION_LAUNCH_FREEFORM);
++                intent.setClassName(EDGE_SERVICE_PACKAGE, EDGE_SERVICE_CLASS);
++                intent.putExtra(EXTRA_PACKAGE_NAME, packageName);
++                getContext().startServiceAsUser(intent, UserHandle.CURRENT);
++            } finally {
++                Binder.restoreCallingIdentity(token);
++            }
++        }
++        
++        @Override
++        public void createFreeform(String name, IFreeformDisplayCallback callback,
++                int width, int height, int densityDpi, boolean secure,
++                boolean ownContentOnly, boolean shouldShowSystemDecorations, Surface surface,
++                float refreshRate, long presentationDeadlineNanos) {
++            final long token = Binder.clearCallingIdentity();
++            try {
++                Slog.i(TAG, "createFreeform: name=" + name + ", token=" + callback.asBinder());
++                DisplayManagerInternal dmi = LocalServices.getService(DisplayManagerInternal.class);
++                if (dmi != null) {
++                    dmi.createFreeformDisplay(name, callback, width, height, densityDpi, secure,
++                            ownContentOnly, shouldShowSystemDecorations, surface, refreshRate,
++                            presentationDeadlineNanos);
++                }
++            } finally {
++                Binder.restoreCallingIdentity(token);
++            }
++        }
++        
++        @Override
++        public void pauseDisplay(int displayId) {
++            final long token = Binder.clearCallingIdentity();
++            try {
++                DisplayManagerInternal dmi = LocalServices.getService(DisplayManagerInternal.class);
++                if (dmi != null) {
++                    dmi.pauseFreeformDisplay(displayId);
++                }
++            } finally {
++                Binder.restoreCallingIdentity(token);
++            }
++        }
++        
++        @Override
++        public void resumeDisplay(int displayId) {
++            final long token = Binder.clearCallingIdentity();
++            try {
++                DisplayManagerInternal dmi = LocalServices.getService(DisplayManagerInternal.class);
++                if (dmi != null) {
++                    dmi.resumeFreeformDisplay(displayId);
++                }
++            } finally {
++                Binder.restoreCallingIdentity(token);
++            }
++        }
++        
++        @Override
++        public void launchAppOnDisplay(String packageName, String activityName, int displayId, int userId) {
++            final long token = Binder.clearCallingIdentity();
++            try {
++                Intent intent = new Intent();
++                intent.setClassName(packageName, activityName);
++                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++                
++                ActivityOptions options = ActivityOptions.makeBasic();
++                options.setLaunchDisplayId(displayId);
++                
++                getContext().startActivityAsUser(intent, options.toBundle(), UserHandle.of(userId));
++            } finally {
++                Binder.restoreCallingIdentity(token);
++            }
++        }
++        
++        @Override
++        public void resizeFreeform(IBinder appToken, int width, int height, int densityDpi) {
++            final long token = Binder.clearCallingIdentity();
++            try {
++                DisplayManagerInternal dmi = LocalServices.getService(DisplayManagerInternal.class);
++                if (dmi != null) {
++                    dmi.resizeFreeform(appToken, width, height, densityDpi);
++                }
++            } finally {
++                Binder.restoreCallingIdentity(token);
++            }
++        }
++        
++        @Override
++        public void releaseFreeform(IBinder appToken) {
++            final long token = Binder.clearCallingIdentity();
++            try {
++                Slog.i(TAG, "releaseFreeform: token=" + appToken);
++                DisplayManagerInternal dmi = LocalServices.getService(DisplayManagerInternal.class);
++                if (dmi != null) {
++                    int displayId = dmi.getDisplayIdForFreeformToken(appToken);
++                    if (displayId > 0) {
++                        minimizeTaskOnDisplay(displayId);
++                    }
++                    dmi.releaseFreeform(appToken);
++                }
++            } finally {
++                Binder.restoreCallingIdentity(token);
++            }
++        }
++        
++        private void minimizeTaskOnDisplay(int displayId) {
++            try {
++                IActivityTaskManager atm = ActivityTaskManager.getService();
++                List<android.app.ActivityManager.RunningTaskInfo> tasks = 
++                        atm.getTasks(1, false, false, displayId);
++                if (tasks != null && !tasks.isEmpty()) {
++                    int taskId = tasks.get(0).taskId;
++                    atm.moveRootTaskToDisplayOnTopOrBottom(taskId, Display.DEFAULT_DISPLAY, false);
++                    Slog.i(TAG, "Minimized task " + taskId + " from display " + displayId);
++                }
++            } catch (RemoteException e) {
++                Slog.e(TAG, "Failed to minimize task on display " + displayId, e);
++            }
++        }
++    }
++}
+diff --git a/services/core/java/com/android/server/wm/Session.java b/services/core/java/com/android/server/wm/Session.java
+index d591ec3e4c90c..b9d543210fcc5 100644
+--- a/services/core/java/com/android/server/wm/Session.java
++++ b/services/core/java/com/android/server/wm/Session.java
+@@ -1019,4 +1019,31 @@ public void notifyImeWindowVisibilityChangedFromClient(IWindow window, boolean v
+             }
+         }
+     }
++    
++    @Override
++    public void bringToFront(IWindow window) {
++        synchronized (mService.mGlobalLock) {
++            final long identity = Binder.clearCallingIdentity();
++            try {
++                final WindowState win = mService.windowForClientLocked(this, window,
++                        false /* throwOnError */);
++                if (win == null) {
++                    Slog.w(TAG_WM, "bringToFront: window not found");
++                    return;
++                }
++                
++                final WindowToken token = win.mToken;
++                if (token != null) {
++                    token.positionChildAt(WindowContainer.POSITION_TOP, win, true /* includingParents */);
++                    final DisplayContent dc = win.getDisplayContent();
++                    if (dc != null) {
++                        dc.assignWindowLayers(true /* setLayoutNeeded */);
++                        dc.scheduleAnimation();
++                    }
++                }
++            } finally {
++                Binder.restoreCallingIdentity(identity);
++            }
++        }
++    }
+ }
+diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
+index dd4c992494b0a..3c377a6976d6f 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerService.java
++++ b/services/core/java/com/android/server/wm/WindowManagerService.java
+@@ -10988,4 +10988,34 @@ public void apply(@UserIdInt int userId) {
+             }
+         }
+     }
++
++    //Ext add
++    final WindowState windowForClientLocked(Session session, IWindow client, boolean throwOnError) {
++        return windowForClientLocked(session, client.asBinder(), throwOnError);
++    }
++
++    final WindowState windowForClientLocked(Session session, IBinder client, boolean throwOnError) {
++        WindowState win = mWindowMap.get(client);
++        if (DEBUG) Slog.v(TAG_WM, "Looking up client " + client + ": " + win);
++        if (win == null) {
++            if (throwOnError) {
++                throw new IllegalArgumentException(
++                        "Requested window " + client + " does not exist");
++            }
++            ProtoLog.w(WM_ERROR, "Failed looking up window session=%s callers=%s", session,
++                    Debug.getCallers(3));
++            return null;
++        }
++        if (session != null && win.mSession != session) {
++            if (throwOnError) {
++                throw new IllegalArgumentException("Requested window " + client + " is in session "
++                        + win.mSession + ", not " + session);
++            }
++            ProtoLog.w(WM_ERROR, "Failed looking up window session=%s callers=%s", session,
++                    Debug.getCallers(3));
++            return null;
++        }
++
++        return win;
++    }
+ }
+diff --git a/services/java/com/android/server/SystemServer.java b/services/java/com/android/server/SystemServer.java
+index a184d6a7efe8e..08434f3fb0a48 100644
+--- a/services/java/com/android/server/SystemServer.java
++++ b/services/java/com/android/server/SystemServer.java
+@@ -313,6 +313,7 @@
+ import com.android.server.wearable.WearableSensingManagerService;
+ import com.android.server.webkit.WebViewUpdateService;
+ import com.android.server.wm.ActivityTaskManagerService;
++import com.android.server.wm.FreeformOverlayManagerService;
+ import com.android.server.wm.WindowManagerGlobalLock;
+ import com.android.server.wm.WindowManagerService;
+ 
+@@ -1767,6 +1768,10 @@ private void startOtherServices(@NonNull TimingsTraceAndSlog t) {
+             mDisplayManagerService.windowManagerAndInputReady();
+             t.traceEnd();
+ 
++            t.traceBegin("StartFreeformOverlayManagerService");
++            mSystemServiceManager.startService(FreeformOverlayManagerService.class);
++            t.traceEnd();
++
+             if (mFactoryTestMode == FactoryTest.FACTORY_TEST_LOW_LEVEL) {
+                 Slog.i(TAG, "No Bluetooth Service (factory test)");
+             } else if (!context.getPackageManager().hasSystemFeature
